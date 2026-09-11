@@ -38,6 +38,18 @@ def train_model_from_db():
     ncf_model.fit([X[:, 0], X[:, 1]], y, epochs=5, batch_size=1, verbose=0)
     print(f"Model retrained on {len(rows)} ratings")
 
+
+def ensure_db_ready():
+    """On a fresh deploy, movies.db won't exist yet (it's gitignored).
+    Create the tables if they're missing, so the app can start cleanly."""
+    conn = get_db_connection()
+    conn.execute('CREATE TABLE IF NOT EXISTS movies (id INTEGER PRIMARY KEY, title TEXT, genre TEXT)')
+    conn.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)')
+    conn.execute('CREATE TABLE IF NOT EXISTS ratings (user_id INTEGER, movie_id INTEGER, rating REAL)')
+    conn.commit()
+    conn.close()
+
+ensure_db_ready()
 ncf_model = build_ncf(USER_SLOTS, MOVIE_SLOTS)
 train_model_from_db()
 
