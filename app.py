@@ -243,34 +243,3 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
     
     
-from omdb_client import omdb_search_by_title, cache_movie_in_db
-
-@app.route('/api/search', methods=['GET'])
-def api_search():
-    query = (request.args.get('q') or '').strip()
-    if not query:
-        return jsonify({"results": []})
-
-    conn = get_db_connection()
-    local_matches = conn.execute(
-        'SELECT id, title FROM movies WHERE title LIKE ? ORDER BY title LIMIT 20',
-        (f'%{query}%',)
-    ).fetchall()
-    conn.close()
-
-    if local_matches:
-        return jsonify({
-            "results": [{"id": m["id"], "title": m["title"]} for m in local_matches],
-            "source": "local"
-        })
-
-    # Nothing local — try OMDb, then cache the result so next time it's local
-    omdb_data = omdb_search_by_title(query)
-    if not omdb_data:
-        return jsonify({"results": [], "source": "none"})
-
-    movie_id = cache_movie_in_db(omdb_data)
-    return jsonify({
-        "results": [{"id": movie_id, "title": omdb_data["Title"]}],
-        "source": "omdb"
-    })
