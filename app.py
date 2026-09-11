@@ -235,18 +235,22 @@ def api_recommendations():
     movie_genres = {row['id']: row['genre'] for row in conn2.execute('SELECT id, genre FROM movies').fetchall()}
     conn2.close()
 
-    results = []
-    for m in unrated:
-        ncf_score = float(ncf_model.predict(
-            [np.array([user_slot(user_id)]), np.array([movie_slot(m['id'])])],
-            verbose=0
-        )[0][0])
+    # Predict for ALL unrated movies in a single batched call instead of
+    # looping model.predict() once per movie. Each individual predict()
+    # call carries fixed TensorFlow overhead that doesn't shrink for a
+    # batch of 1 — looping it per movie was slow enough on Render's
+    # limited free-tier CPU to hang the request indefinitely.
+    user_slots_batch = np.array([user_slot(user_id)] * len(unrated))
+    movie_slots_batch = np.array([movie_slot(m['id']) for m in unrated])
+    ncf_scores = ncf_model.predict([user_slots_batch, movie_slots_batch], verbose=0).flatten()
 
+    results = []
+    for m, ncf_score in zip(unrated, ncf_scores):
         genre = movie_genres.get(m['id'], 'Unknown')
         genre_score = genre_prefs.get(genre, 0.5)  # neutral 0.5 if genre unseen
 
         # Hybrid: mostly collaborative, nudged by genre affinity
-        final_score = (0.75 * ncf_score) + (0.25 * genre_score)
+        final_score = (0.75 * float(ncf_score)) + (0.25 * genre_score)
         results.append({"movie": m['title'], "genre": movie_genres.get(m['id'], ''), "match_percent": round(final_score * 100)})
 
     results.sort(key=lambda r: r['match_percent'], reverse=True)
