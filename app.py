@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from textblob import TextBlob
 from hybrid_movie_recommendation_engine import build_ncf, calculate_hybrid_score
-
+import threading
 from omdb_client import omdb_search_multiple, omdb_get_by_imdb_id, cache_movie_in_db
 app = Flask(__name__)
 
@@ -27,7 +27,12 @@ def train_model_from_db():
     Our dataset is tiny (dozens of rows at most for a demo), so a full
     retrain on every new rating is cheap and gives the effect of the
     model 'learning' live. A production system with real traffic would
-    instead retrain on a schedule (e.g. nightly batch job), not per-request."""
+    instead retrain on a schedule (e.g. nightly batch job), not per-request.
+
+    IMPORTANT: this is called from a background thread (see api_rate and
+    the startup block below), never directly in a request/startup path —
+    on Render's free-tier CPU, running this synchronously was blocking
+    long enough to trip gunicorn's worker timeout, causing a boot crash loop."""
     conn = get_db_connection()
     rows = conn.execute('SELECT * FROM ratings').fetchall()
     conn.close()
@@ -51,7 +56,12 @@ def ensure_db_ready():
 
 ensure_db_ready()
 ncf_model = build_ncf(USER_SLOTS, MOVIE_SLOTS)
-train_model_from_db()
+# Run the initial training in a background thread instead of blocking
+# module import (which happens during gunicorn worker boot). Doing this
+# synchronously was pushing worker startup past gunicorn's timeout on
+# Render's free tier, causing repeated WORKER TIMEOUT / SIGKILL crashes
+# before the app ever got a chance to serve a single request.
+threading.Thread(target=train_model_from_db, daemon=True).start()
 
 def get_sentiment_score(text):
     analysis = TextBlob(text)
@@ -170,7 +180,10 @@ def api_rate():
     conn.commit()
     conn.close()
 
-    train_model_from_db()
+    # Retrain in the background so the response returns immediately —
+    # running this in-request was blocking long enough on Render's free
+    # tier to hang the browser / trip the worker timeout.
+    threading.Thread(target=train_model_from_db, daemon=True).start()
 
     return jsonify({"message": f"Saved your {stars}-star rating for {movie_row['title']}!"})
 
@@ -241,5 +254,3 @@ def api_recommendations():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-    
-    
