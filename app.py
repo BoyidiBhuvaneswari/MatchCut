@@ -11,6 +11,14 @@ app = Flask(__name__)
 USER_SLOTS = 500
 MOVIE_SLOTS = 500
 
+# Keras/TensorFlow models are not guaranteed thread-safe. Training now
+# happens in a background thread (see api_rate and the startup block
+# below) so it doesn't block HTTP responses, but that means a background
+# fit() call and a request-thread predict() call could hit the model at
+# the same instant. Without this lock, that collision can hang BOTH
+# calls indefinitely rather than just running them one at a time.
+model_lock = threading.Lock()
+
 def get_db_connection():
     conn = sqlite3.connect('movies.db')
     conn.row_factory = sqlite3.Row
@@ -40,7 +48,8 @@ def train_model_from_db():
         return
     X = np.array([[user_slot(r['user_id']), movie_slot(r['movie_id'])] for r in rows])
     y = np.array([r['rating'] for r in rows])
-    ncf_model.fit([X[:, 0], X[:, 1]], y, epochs=5, batch_size=1, verbose=0)
+    with model_lock:
+        ncf_model.fit([X[:, 0], X[:, 1]], y, epochs=5, batch_size=1, verbose=0)
     print(f"Model retrained on {len(rows)} ratings")
 
 
@@ -242,7 +251,8 @@ def api_recommendations():
     # limited free-tier CPU to hang the request indefinitely.
     user_slots_batch = np.array([user_slot(user_id)] * len(unrated))
     movie_slots_batch = np.array([movie_slot(m['id']) for m in unrated])
-    ncf_scores = ncf_model.predict([user_slots_batch, movie_slots_batch], verbose=0).flatten()
+    with model_lock:
+        ncf_scores = ncf_model.predict([user_slots_batch, movie_slots_batch], verbose=0).flatten()
 
     results = []
     for m, ncf_score in zip(unrated, ncf_scores):
