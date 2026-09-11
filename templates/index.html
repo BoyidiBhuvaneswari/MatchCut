@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match Cut — Movie Recommender</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15121C;
+    --surface:#1E1A28;
+    --surface-raised:#262032;
+    --rule:#332C40;
+    --text:#F3EFE6;
+    --text-muted:#A79FB8;
+    --accent:#E4A33D;
+    --accent-dim:rgba(228,163,61,0.14);
+    --error:#E27D6B;
+    --radius:4px;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+  }
+  .shell{
+    display:flex;
+    min-height:100vh;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:260px;
+    flex-shrink:0;
+    background:var(--surface);
+    border-right:1px solid var(--rule);
+    padding:28px 20px;
+    display:flex;
+    flex-direction:column;
+  }
+  .wordmark{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:1.5rem;
+    letter-spacing:-0.01em;
+    margin:0 0 2px 0;
+  }
+  .wordmark span{ color:var(--accent); }
+  .tagline{
+    font-size:0.78rem;
+    color:var(--text-muted);
+    margin:0 0 32px 0;
+    line-height:1.4;
+  }
+
+  .identity{
+    padding-bottom:20px;
+    margin-bottom:20px;
+    border-bottom:1px solid var(--rule);
+  }
+  .identity-label{
+    font-size:0.72rem;
+    color:var(--text-muted);
+    margin-bottom:4px;
+  }
+  .identity-name{
+    font-size:1.05rem;
+    font-weight:600;
+  }
+  .switch-user{
+    background:none;
+    border:none;
+    color:var(--text-muted);
+    font-size:0.78rem;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    padding:0;
+    margin-top:8px;
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
+  .switch-user:hover{ color:var(--text); }
+
+  nav.tabs{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .nav-tab{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:11px 12px;
+    border-radius:var(--radius);
+    background:transparent;
+    border:none;
+    color:var(--text-muted);
+    font-family:'Inter',sans-serif;
+    font-size:0.92rem;
+    text-align:left;
+    cursor:pointer;
+  }
+  .nav-tab .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--rule);
+    flex-shrink:0;
+  }
+  .nav-tab.active{
+    background:var(--accent-dim);
+    color:var(--text);
+  }
+  .nav-tab.active .dot{ background:var(--accent); }
+  .nav-tab:hover:not(.active){ color:var(--text); }
+
+  .sidebar-foot{
+    margin-top:auto;
+    font-size:0.72rem;
+    color:var(--text-muted);
+    padding-top:20px;
+  }
+
+  /* ---------- Main ---------- */
+  main{
+    flex:1;
+    padding:40px 48px;
+    max-width:640px;
+  }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  h1.section-title{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:1.6rem;
+    margin:0 0 6px 0;
+  }
+  p.section-sub{
+    color:var(--text-muted);
+    font-size:0.92rem;
+    margin:0 0 28px 0;
+    line-height:1.5;
+  }
+
+  /* Signup */
+  .signup-box input[type=text]{
+    width:100%;
+    max-width:280px;
+  }
+
+  input[type=text], textarea{
+    background:var(--surface-raised);
+    border:1px solid var(--rule);
+    border-radius:var(--radius);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:0.95rem;
+    padding:10px 12px;
+    width:100%;
+  }
+  input[type=text]:focus, textarea:focus{
+    outline:none;
+    border-color:var(--accent);
+  }
+  textarea{ resize:vertical; min-height:70px; margin-top:14px; }
+
+  button.primary{
+    background:var(--accent);
+    color:#15121C;
+    border:none;
+    border-radius:var(--radius);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:0.92rem;
+    padding:11px 20px;
+    cursor:pointer;
+    margin-top:16px;
+  }
+  button.primary:hover{ filter:brightness(1.08); }
+  button.primary:focus-visible, input:focus-visible, textarea:focus-visible, .nav-tab:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* Search */
+  .search-wrap{ position:relative; max-width:360px; }
+  .search-results{
+    margin-top:6px;
+    border:1px solid var(--rule);
+    border-radius:var(--radius);
+    background:var(--surface-raised);
+    max-height:220px;
+    overflow-y:auto;
+  }
+  .search-results:empty{ display:none; border:none; }
+  .search-row{
+    padding:9px 12px;
+    font-size:0.9rem;
+    cursor:pointer;
+    border-bottom:1px solid var(--rule);
+  }
+  .search-row:last-child{ border-bottom:none; }
+  .search-row:hover{ background:var(--accent-dim); }
+  .search-status{
+    padding:9px 12px;
+    font-size:0.85rem;
+    color:var(--text-muted);
+  }
+  .selected-movie{
+    margin-top:10px;
+    font-size:0.85rem;
+    color:var(--accent);
+  }
+
+  /* Stars */
+  .stars{ margin-top:22px; font-size:1.7rem; letter-spacing:2px; }
+  .star{ color:var(--rule); cursor:pointer; transition:color .1s; }
+  .star.selected{ color:var(--accent); }
+
+  /* Messages */
+  .msg{ margin-top:14px; font-size:0.88rem; }
+  .msg.ok{ color:var(--accent); }
+  .msg.err{ color:var(--error); }
+
+  /* Recommendations */
+  .rec-list{ margin-top:8px; }
+  .rec-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:14px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .rec-row:first-child{ padding-top:0; }
+  .rec-main{ flex:1; min-width:0; }
+  .rec-title{ font-size:0.98rem; font-weight:500; }
+  .rec-genre{ font-size:0.78rem; color:var(--text-muted); margin-top:2px; }
+  .rec-meter{
+    width:110px;
+    flex-shrink:0;
+  }
+  .rec-bar-track{
+    height:4px;
+    background:var(--rule);
+    border-radius:2px;
+    overflow:hidden;
+  }
+  .rec-bar-fill{
+    height:100%;
+    background:var(--accent);
+    border-radius:2px;
+  }
+  .rec-percent{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.82rem;
+    font-weight:500;
+    color:var(--accent);
+    margin-top:5px;
+    text-align:right;
+  }
+  .rec-empty{
+    color:var(--text-muted);
+    font-size:0.9rem;
+    padding:20px 0;
+  }
+
+  @media (max-width: 720px){
+    .shell{ flex-direction:column; }
+    .sidebar{
+      width:100%;
+      flex-direction:row;
+      align-items:center;
+      flex-wrap:wrap;
+      padding:16px 20px;
+      gap:16px;
+    }
+    .identity{ border:none; padding:0; margin:0; }
+    nav.tabs{ flex-direction:row; }
+    .sidebar-foot{ display:none; }
+    main{ padding:28px 20px; max-width:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <aside class="sidebar">
+    <div>
+      <p class="wordmark">Match<span>Cut</span></p>
+      <p class="tagline">Rate what you've seen. Find what's next.</p>
+    </div>
+
+    <div id="identityBox" class="identity" style="display:none;">
+      <div class="identity-label">Signed in as</div>
+      <div class="identity-name" id="identityName"></div>
+      <button class="switch-user" onclick="logout()">Switch user</button>
+    </div>
+
+    <nav class="tabs" id="tabNav" style="display:none;">
+      <button class="nav-tab active" id="tabRateBtn" onclick="switchTab('rate')">
+        <span class="dot"></span> Rate a movie
+      </button>
+      <button class="nav-tab" id="tabRecBtn" onclick="switchTab('rec')">
+        <span class="dot"></span> Get recommendations
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">Hybrid model — collaborative filtering + genre affinity</div>
+  </aside>
+
+  <main>
+
+    <!-- SIGNUP -->
+    <div id="signupPanel" class="panel active">
+      <h1 class="section-title">Welcome</h1>
+      <p class="section-sub">Enter a name to start rating movies and building your recommendations.</p>
+      <div class="signup-box">
+        <input type="text" id="nameInput" placeholder="Your name" autocomplete="off">
+        <br>
+        <button class="primary" onclick="signUp()">Continue</button>
+      </div>
+    </div>
+
+    <!-- RATE -->
+    <div id="ratePanel" class="panel">
+      <h1 class="section-title">Rate a movie</h1>
+      <p class="section-sub">Already watched something? Rate it here — this is what teaches the model your taste. No score shown back; that's not the point.</p>
+
+      <div class="search-wrap">
+        <input type="text" id="movieSearch" placeholder="Search for a movie..." autocomplete="off">
+        <div class="search-results" id="searchResults"></div>
+        <input type="hidden" id="movieId">
+      </div>
+      <div class="selected-movie" id="selectedMovie"></div>
+
+      <div class="stars" id="starPicker">
+        <span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span>
+      </div>
+
+      <textarea id="review" placeholder="Optional: say a bit about why"></textarea>
+      <br>
+      <button class="primary" onclick="submitRating()">Save rating</button>
+      <div id="rateResult"></div>
+    </div>
+
+    <!-- RECOMMEND -->
+    <div id="recPanel" class="panel">
+      <h1 class="section-title">Your recommendations</h1>
+      <p class="section-sub">Ranked by predicted match, based on everything you've rated so far.</p>
+      <button class="primary" onclick="loadRecommendations()">Show my recommendations</button>
+      <div class="rec-list" id="recResult"></div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  let currentUserId = localStorage.getItem('movieRecUserId');
+  let currentUserName = localStorage.getItem('movieRecUserName');
+  let selectedStars = 0;
+  let searchTimeout = null;
+
+  function switchTab(tab){
+    document.getElementById('ratePanel').classList.toggle('active', tab === 'rate');
+    document.getElementById('recPanel').classList.toggle('active', tab === 'rec');
+    document.getElementById('tabRateBtn').classList.toggle('active', tab === 'rate');
+    document.getElementById('tabRecBtn').classList.toggle('active', tab === 'rec');
+  }
+
+  document.querySelectorAll('.star').forEach(star => {
+    star.addEventListener('click', () => {
+      selectedStars = parseInt(star.dataset.value);
+      document.querySelectorAll('.star').forEach(s => {
+        s.classList.toggle('selected', parseInt(s.dataset.value) <= selectedStars);
+      });
+    });
+  });
+
+  function setupMovieSearch(){
+    const input = document.getElementById('movieSearch');
+    const resultsDiv = document.getElementById('searchResults');
+
+    input.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      const query = input.value.trim();
+      document.getElementById('movieId').value = '';
+      document.getElementById('selectedMovie').textContent = '';
+
+      if (query.length < 2){
+        resultsDiv.innerHTML = '';
+        return;
+      }
+
+      searchTimeout = setTimeout(async () => {
+        resultsDiv.innerHTML = '<div class="search-status">Searching...</div>';
+        try {
+          const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+          const data = await res.json();
+
+          if (!data.results || data.results.length === 0){
+            resultsDiv.innerHTML = '<div class="search-status">No matches found</div>';
+            return;
+          }
+
+          resultsDiv.innerHTML = data.results.map(m =>
+            `<div class="search-row" data-id="${m.id}" data-title="${m.title}">${m.title}</div>`
+          ).join('');
+
+          document.querySelectorAll('.search-row').forEach(row => {
+            row.addEventListener('click', () => {
+              document.getElementById('movieId').value = row.dataset.id;
+              input.value = row.dataset.title;
+              document.getElementById('selectedMovie').textContent = `Selected: ${row.dataset.title}`;
+              resultsDiv.innerHTML = '';
+            });
+          });
+        } catch (err){
+          resultsDiv.innerHTML = `<div class="search-status" style="color:var(--error);">Search failed: ${err.message}</div>`;
+        }
+      }, 400);
+    });
+  }
+
+  function showApp(){
+    document.getElementById('signupPanel').classList.remove('active');
+    document.getElementById('identityBox').style.display = 'block';
+    document.getElementById('tabNav').style.display = 'flex';
+    document.getElementById('identityName').textContent = currentUserName;
+    switchTab('rate');
+    setupMovieSearch();
+  }
+
+  function logout(){
+    localStorage.removeItem('movieRecUserId');
+    localStorage.removeItem('movieRecUserName');
+    location.reload();
+  }
+
+  async function signUp(){
+    const name = document.getElementById('nameInput').value.trim();
+    if (!name) return;
+    const response = await fetch('/api/signup', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name })
+    });
+    const result = await response.json();
+    if (result.error){ alert(result.error); return; }
+    currentUserId = result.user_id;
+    currentUserName = result.name;
+    localStorage.setItem('movieRecUserId', currentUserId);
+    localStorage.setItem('movieRecUserName', currentUserName);
+    showApp();
+  }
+
+  async function submitRating(){
+    const resDiv = document.getElementById('rateResult');
+    const movieId = document.getElementById('movieId').value;
+
+    if (!movieId){
+      resDiv.innerHTML = `<p class="msg err">Search for and select a movie first.</p>`;
+      return;
+    }
+    if (!selectedStars){
+      resDiv.innerHTML = `<p class="msg err">Pick a star rating first.</p>`;
+      return;
+    }
+
+    resDiv.innerHTML = `<p class="msg">Saving...</p>`;
+
+    const data = {
+      user_id: currentUserId,
+      movie_id: movieId,
+      stars: selectedStars,
+      review: document.getElementById('review').value
+    };
+
+    const response = await fetch('/api/rate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+
+    if (result.error){
+      resDiv.innerHTML = `<p class="msg err">${result.error}</p>`;
+      return;
+    }
+
+    resDiv.innerHTML = `<p class="msg ok">${result.message}</p>`;
+    selectedStars = 0;
+    document.querySelectorAll('.star').forEach(s => s.classList.remove('selected'));
+    document.getElementById('review').value = '';
+    document.getElementById('movieSearch').value = '';
+    document.getElementById('movieId').value = '';
+    document.getElementById('selectedMovie').textContent = '';
+  }
+
+  async function loadRecommendations(){
+    const resDiv = document.getElementById('recResult');
+    resDiv.innerHTML = `<p class="msg">Thinking...</p>`;
+
+    const response = await fetch(`/api/recommendations?user_id=${currentUserId}`);
+    const result = await response.json();
+
+    if (result.error){
+      resDiv.innerHTML = `<p class="msg err">${result.error}</p>`;
+      return;
+    }
+    if (!result.recommendations || result.recommendations.length === 0){
+      resDiv.innerHTML = `<p class="rec-empty">${result.message || "No recommendations yet — rate a few movies first."}</p>`;
+      return;
+    }
+
+    resDiv.innerHTML = result.recommendations.map(r => `
+      <div class="rec-row">
+        <div class="rec-main">
+          <div class="rec-title">${r.movie}</div>
+          ${r.genre ? `<div class="rec-genre">${r.genre}</div>` : ''}
+        </div>
+        <div class="rec-meter">
+          <div class="rec-bar-track"><div class="rec-bar-fill" style="width:${r.match_percent}%"></div></div>
+          <div class="rec-percent">${r.match_percent}%</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if (currentUserId && currentUserName){
+    showApp();
+  }
+</script>
+
+</body>
+</html>

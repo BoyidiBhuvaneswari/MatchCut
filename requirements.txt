@@ -1,0 +1,13 @@
+flask
+textblob
+pysqlite3
+requests
+tensorflow
+numpy
+scikit-learn
+pandas
+flask
+textblob
+numpy
+tensorflow
+gunicorn
