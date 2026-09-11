@@ -49,7 +49,13 @@ def train_model_from_db():
     X = np.array([[user_slot(r['user_id']), movie_slot(r['movie_id'])] for r in rows])
     y = np.array([r['rating'] for r in rows])
     with model_lock:
-        ncf_model.fit([X[:, 0], X[:, 1]], y, epochs=5, batch_size=1, verbose=0)
+        # Full-batch (one gradient step per epoch) instead of batch_size=1
+        # (one step per row). For a handful of ratings, batch_size=1 meant
+        # 5 epochs x N rows = many separate steps, each with fixed
+        # overhead — slow enough on Render's free-tier CPU to blow past
+        # gunicorn's request timeout when a prediction request was
+        # waiting on this same lock.
+        ncf_model.fit([X[:, 0], X[:, 1]], y, epochs=5, batch_size=len(rows), verbose=0)
     print(f"Model retrained on {len(rows)} ratings")
 
 
